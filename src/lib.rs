@@ -146,7 +146,8 @@ impl<K: Ord, V> SkipList<K, V> {
                     }
                 }
 
-                let node = Box::from_raw(node.as_ptr());
+                let mut node = Box::from_raw(node.as_ptr());
+                node.key.assume_init_drop();
                 return Some(node.value.assume_init());
             }
         }
