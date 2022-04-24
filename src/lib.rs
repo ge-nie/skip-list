@@ -31,9 +31,104 @@ impl<K, V> Node<K, V> {
 
 pub struct SkipList<K, V> {
     head: NonNull<Node<K, V>>,
+    len: usize,
     level: usize,
     max_level: usize,
     marker: PhantomData<Node<K, V>>,
+}
+
+pub struct Iter<'a, K: 'a, V: 'a> {
+    len: usize,
+    head: Option<NonNull<Node<K, V>>>,
+    marker: PhantomData<&'a Node<K, V>>,
+}
+
+pub struct IterMut<'a, K: 'a, V: 'a> {
+    len: usize,
+    head: Option<NonNull<Node<K, V>>>,
+    marker: PhantomData<&'a Node<K, V>>,
+}
+
+pub struct IntoIter<K, V> {
+    len: usize,
+    head: Option<NonNull<Node<K, V>>>,
+    marker: PhantomData<Node<K, V>>,
+}
+
+impl<'a, K, V> Iterator for Iter<'a, K, V> {
+    type Item = (&'a K, &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.head.map(|node| unsafe {
+            self.head = node.as_ref().next[0];
+            self.len -= 1;
+            let k = node.as_ref().key.assume_init_ref();
+            let v = node.as_ref().value.assume_init_ref();
+            (k, v)
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        self.len
+    }
+}
+
+impl<'a, K, V> Iterator for IterMut<'a, K, V> {
+    type Item = (&'a K, &'a mut V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.head.map(|mut node| unsafe {
+            self.head = node.as_ref().next[0];
+            self.len -= 1;
+            let k = node.as_ref().key.assume_init_ref();
+            let v = &mut *node.as_mut().value.as_mut_ptr();
+            (k, v)
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        self.len
+    }
+}
+
+impl<K, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.head.map(|node| unsafe {
+            let node = Box::from_raw(node.as_ptr());
+
+            self.head = node.next[0];
+            self.len -= 1;
+            let k = node.key.assume_init();
+            let v = node.value.assume_init();
+
+            (k, v)
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        self.len
+    }
 }
 
 impl<K, V> Default for SkipList<K, V> {
@@ -42,6 +137,7 @@ impl<K, V> Default for SkipList<K, V> {
         let node = Box::leak(Box::new(Node::sigil(max_level))).into();
         Self {
             head: node,
+            len: 0,
             level: 0,
             max_level,
             marker: PhantomData,
@@ -103,7 +199,6 @@ impl<K: Ord, V> SkipList<K, V> {
 
         let mut node: NonNull<Node<K, V>> =
             Box::leak(Box::new(Node::new(k, v, level, self.max_level))).into();
-
         for (l, ln) in updates.iter_mut().enumerate().take(level) {
             if let Some(ln) = ln {
                 unsafe {
@@ -112,6 +207,7 @@ impl<K: Ord, V> SkipList<K, V> {
                 }
             }
         }
+        self.len += 1;
         None
     }
 
@@ -145,7 +241,7 @@ impl<K: Ord, V> SkipList<K, V> {
                         ln.as_mut().next[l] = node.as_ref().next[l];
                     }
                 }
-
+                self.len -= 1;
                 let mut node = Box::from_raw(node.as_ptr());
                 node.key.assume_init_drop();
                 return Some(node.value.assume_init());
@@ -154,9 +250,41 @@ impl<K: Ord, V> SkipList<K, V> {
         None
     }
 
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        Iter {
+            len: self.len,
+            head: unsafe { self.head.as_ref().next[0] },
+            marker: PhantomData,
+        }
+    }
+
+    pub fn iter_mut(&self) -> IterMut<'_, K, V> {
+        IterMut {
+            len: self.len,
+            head: unsafe { self.head.as_ref().next[0] },
+            marker: PhantomData,
+        }
+    }
+
     fn random_level(&self) -> usize {
         let mut rng = rand::thread_rng();
         rng.gen_range(1..self.max_level)
+    }
+}
+
+impl<K, V> IntoIterator for SkipList<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
+    fn into_iter(mut self) -> Self::IntoIter {
+        let node = unsafe { self.head.as_ref().next[0] };
+        unsafe {
+            self.head.as_mut().next[0] = None;
+        }
+        IntoIter {
+            len: self.len,
+            head: node,
+            marker: PhantomData,
+        }
     }
 }
 
@@ -208,6 +336,24 @@ mod tests {
         for i in 50..100 {
             let v = i * 10;
             assert_eq!(skip_list.get(&i), Some(&v));
+        }
+
+        for (k, v) in skip_list.iter_mut() {
+            *v = *k * 20;
+        }
+
+        let mut key = 50;
+        for (k, v) in skip_list.iter() {
+            assert_eq!(*k, key);
+            assert_eq!(*v, key * 20);
+            key += 1;
+        }
+
+        key = 50;
+        for (k, v) in skip_list.into_iter() {
+            assert_eq!(k, key);
+            assert_eq!(v, key * 20);
+            key += 1;
         }
     }
 }
