@@ -2,6 +2,13 @@
 name = "skip-list"
 version = "0.1.0"
 edition = "2021"
+keywords = ['skiplist']
+description = 'Implementing a skip list with rust'
+document = 'https://github.com/ge-nie/skip-list'
+homepage = 'https://github.com/ge-nie/skip-list'
+repository = 'https://github.com/ge-nie/skip-list'
+
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
