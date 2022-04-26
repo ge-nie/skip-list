@@ -146,6 +146,17 @@ impl<K, V> Default for SkipList<K, V> {
 }
 
 impl<K: Ord, V> SkipList<K, V> {
+    pub fn new(max_level: usize) -> Self {
+        let node = Box::leak(Box::new(Node::sigil(max_level))).into();
+        Self {
+            head: node,
+            len: 0,
+            level: 0,
+            max_level,
+            marker: PhantomData,
+        }
+    }
+
     pub fn get(&self, k: &K) -> Option<&V> {
         let mut node = self.head;
         for l in (0..self.level).rev() {
@@ -354,6 +365,31 @@ mod tests {
             assert_eq!(k, key);
             assert_eq!(v, key * 20);
             key += 1;
+        }
+    }
+
+    #[test]
+    fn test_sl() {
+        let mut skip_list = SkipList::default();
+        // insert
+        assert_eq!(skip_list.insert(1, 10), None); // there is no value with key with 1
+        assert_eq!(skip_list.insert(2, 20), None);
+        assert_eq!(skip_list.insert(3, 30), None);
+
+        // get
+        assert_eq!(skip_list.get(&1), Some(&10));
+        assert_eq!(skip_list.get(&2), Some(&20));
+        assert_eq!(skip_list.get(&3), Some(&30));
+
+        // update
+        assert_eq!(skip_list.insert(1, 100), Some(10));
+        assert_eq!(skip_list.insert(2, 200), Some(20));
+        assert_eq!(skip_list.insert(3, 300), Some(30));
+
+        // iterator
+        for (k, v) in skip_list.iter() {
+            let value = k * 100;
+            assert_eq!(*v, value);
         }
     }
 }
