@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Genie <inathan@163.com>"]
 keywords = ['skiplist']
 description = 'Implementing a skip list with rust'
-document = 'https://docs.rs/skip-list'
+documentation = 'https://docs.rs/skip-list'
 homepage = 'https://github.com/ge-nie/skip-list'
 repository = 'https://github.com/ge-nie/skip-list'
 
