@@ -1,6 +1,6 @@
 [package]
 name = "skip-list"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Genie <inathan@163.com>"]
 keywords = ['skiplist']
