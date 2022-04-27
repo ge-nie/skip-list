@@ -1,3 +1,40 @@
+//! Implementing a skip list with Rust. The SkipList supports `insert`,
+//! `get`, `delete` and iterator such as `iter`, `iter_mut`, `into_iter`.
+//! The default max level of skip list is 12 when use SkipList::default().
+//! The max level of skip list can be customized by SkipList::new(max_level: usize).
+//!
+//! # Example
+//! ```rust
+//! use skip_list::SkipList;
+//! 
+//! let mut skip_list = SkipList::default();
+// insert
+//! assert_eq!(skip_list.insert(1, 10), None); // there is no value with key with 1
+//! assert_eq!(skip_list.insert(2, 20), None);
+//! assert_eq!(skip_list.insert(3, 30), None);
+//! 
+//! // get
+//! assert_eq!(skip_list.get(&1), Some(&10));
+//! assert_eq!(skip_list.get(&2), Some(&20));
+//! assert_eq!(skip_list.get(&3), Some(&30));
+//! 
+//! // update
+//! assert_eq!(skip_list.insert(1, 100), Some(10));
+//! assert_eq!(skip_list.insert(2, 200), Some(20));
+//! assert_eq!(skip_list.insert(3, 300), Some(30));
+//! 
+//! // iterator
+//! for (k, v) in skip_list.iter() {
+//!     let value = k * 100;
+//!     assert_eq!(*v, value);
+//! }
+//! 
+//! // delete
+//! assert_eq!(skip_list.delete(&1), Some(100));
+//! assert_eq!(skip_list.delete(&10), None);
+//! assert_eq!(skip_list.get(&1), None);
+//! ```
+
 use std::{marker::PhantomData, ptr::NonNull};
 
 use rand::Rng;
@@ -132,6 +169,14 @@ impl<K, V> Iterator for IntoIter<K, V> {
 }
 
 impl<K, V> Default for SkipList<K, V> {
+    /// Create a skip list with max level(12)
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// let mut skiplist: SkipList<i32, i32> = SkipList::default();
+    /// ```
     fn default() -> Self {
         let max_level = 12;
         let node = Box::leak(Box::new(Node::sigil(max_level))).into();
@@ -146,6 +191,14 @@ impl<K, V> Default for SkipList<K, V> {
 }
 
 impl<K: Ord, V> SkipList<K, V> {
+    /// Create a skip list with max level
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// let mut skiplist: SkipList<i32, i32> = SkipList::new(12);
+    /// ```
     pub fn new(max_level: usize) -> Self {
         let node = Box::leak(Box::new(Node::sigil(max_level))).into();
         Self {
@@ -157,6 +210,20 @@ impl<K: Ord, V> SkipList<K, V> {
         }
     }
 
+    /// Returns a reference to the value of the key in skip list or None if
+    /// not exist.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// 
+    /// let mut skip_list = SkipList::default();
+    /// 
+    /// skip_list.insert(1, "a");
+    /// 
+    /// assert_eq!(skip_list.get(&1), Some(&"a"));
+    /// ```
     pub fn get(&self, k: &K) -> Option<&V> {
         let mut node = self.head;
         for l in (0..self.level).rev() {
@@ -177,6 +244,22 @@ impl<K: Ord, V> SkipList<K, V> {
         None
     }
 
+    /// Insert a key-value pair into skip list. If the key already exists,
+    /// updates key's value and return old value. Otherwise, `None` is returned.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// 
+    /// let mut skip_list = SkipList::default();
+    /// 
+    /// assert_eq!(skip_list.insert(1, "a"), None);
+    /// assert_eq!(skip_list.get(&1), Some(&"a"));
+    /// assert_eq!(skip_list.insert(1, "aa"), Some("a"));
+    /// assert_eq!(skip_list.get(&1), Some(&"aa"));
+    /// 
+    /// ```
     pub fn insert(&mut self, k: K, mut v: V) -> Option<V> {
         let mut node = self.head;
         let mut updates = vec![None; self.max_level];
@@ -222,6 +305,21 @@ impl<K: Ord, V> SkipList<K, V> {
         None
     }
 
+    /// Deletes and returns the key's value from skip list or `None` if not exist.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// 
+    /// let mut skip_list = SkipList::default();
+    /// 
+    /// assert_eq!(skip_list.insert(1, "a"), None);
+    /// assert_eq!(skip_list.get(&1), Some(&"a"));
+    /// assert_eq!(skip_list.delete(&1), Some("a"));
+    /// assert_eq!(skip_list.get(&1), None);
+    /// ```
+    /// 
     pub fn delete(&mut self, k: &K) -> Option<V> {
         let mut node = self.head;
         let mut updates = vec![None; self.max_level];
@@ -261,6 +359,33 @@ impl<K: Ord, V> SkipList<K, V> {
         None
     }
 
+    /// Visit all key-value pairs in the order of keys
+    /// The Iterator element type is (&K, &V).
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// 
+    /// let mut skip_list = SkipList::default();
+    /// assert_eq!(skip_list.insert(3, "c"), None);
+    /// assert_eq!(skip_list.insert(4, "d"), None);
+    /// assert_eq!(skip_list.insert(2, "b"), None);
+    /// assert_eq!(skip_list.insert(5, "e"), None);
+    /// assert_eq!(skip_list.insert(1, "a"), None);
+    /// 
+    /// // visit all key-value paris in the order of keys
+    /// let mut keys = vec![];
+    /// let mut values = vec![];
+    /// for (k, v) in skip_list.iter() {
+    ///     keys.push(k);
+    ///     values.push(v);
+    /// }
+    /// 
+    /// // check key sorted
+    /// assert_eq!(keys, vec![&1, &2, &3, &4, &5]);
+    /// assert_eq!(values, vec![&"a", &"b", &"c", &"d", &"e"]);
+    /// ```
     pub fn iter(&self) -> Iter<'_, K, V> {
         Iter {
             len: self.len,
@@ -269,6 +394,37 @@ impl<K: Ord, V> SkipList<K, V> {
         }
     }
 
+    /// Visit all key-value pairs in the order of keys
+    /// The Iterator element type is (&K, &mut V).
+    /// The value is mut, can be update;
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// 
+    /// let mut skip_list = SkipList::default();
+    /// assert_eq!(skip_list.insert(3, 3), None);
+    /// assert_eq!(skip_list.insert(4, 4), None);
+    /// assert_eq!(skip_list.insert(2, 2), None);
+    /// assert_eq!(skip_list.insert(5, 5), None);
+    /// assert_eq!(skip_list.insert(1, 1), None);
+    /// 
+    /// for (k, v) in skip_list.iter_mut() {
+    ///     *v = k * 10;
+    /// }
+    /// // visit all key-value paris in the order of keys
+    /// let mut keys = vec![];
+    /// let mut values = vec![];
+    /// for (k, v) in skip_list.iter() {
+    ///     keys.push(k);
+    ///     values.push(v);
+    /// }
+    /// 
+    /// // check key sorted
+    /// assert_eq!(keys, vec![&1, &2, &3, &4, &5]);
+    /// assert_eq!(values, vec![&10, &20, &30, &40, &50]);
+    /// ```
     pub fn iter_mut(&self) -> IterMut<'_, K, V> {
         IterMut {
             len: self.len,
@@ -286,6 +442,34 @@ impl<K: Ord, V> SkipList<K, V> {
 impl<K, V> IntoIterator for SkipList<K, V> {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
+
+    /// Visit all key-value pairs in the order of keys
+    /// The Iterator element type is (K, V).
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use skip_list::SkipList;
+    /// 
+    /// let mut skip_list = SkipList::default();
+    /// assert_eq!(skip_list.insert(3, "c"), None);
+    /// assert_eq!(skip_list.insert(4, "d"), None);
+    /// assert_eq!(skip_list.insert(2, "b"), None);
+    /// assert_eq!(skip_list.insert(5, "e"), None);
+    /// assert_eq!(skip_list.insert(1, "a"), None);
+    /// 
+    /// // visit all key-value paris in the order of keys
+    /// let mut keys = vec![];
+    /// let mut values = vec![];
+    /// for (k, v) in skip_list.into_iter() {
+    ///     keys.push(k);
+    ///     values.push(v);
+    /// }
+    /// 
+    /// // check key sorted
+    /// assert_eq!(keys, vec![1, 2, 3, 4, 5]);
+    /// assert_eq!(values, vec!["a", "b", "c", "d", "e"]);
+    /// ```
     fn into_iter(mut self) -> Self::IntoIter {
         let node = unsafe { self.head.as_ref().next[0] };
         unsafe {
@@ -391,5 +575,10 @@ mod tests {
             let value = k * 100;
             assert_eq!(*v, value);
         }
+
+        // delete
+        assert_eq!(skip_list.delete(&1), Some(100));
+        assert_eq!(skip_list.delete(&10), None);
+        assert_eq!(skip_list.get(&1), None);
     }
 }

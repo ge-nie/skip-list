@@ -2,6 +2,7 @@
 name = "skip-list"
 version = "0.1.1"
 edition = "2021"
+authors = ["Genie <inathan@163.com>"]
 keywords = ['skiplist']
 description = 'Implementing a skip list with rust'
 document = 'https://github.com/ge-nie/skip-list'

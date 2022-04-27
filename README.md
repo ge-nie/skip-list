@@ -26,4 +26,9 @@ for (k, v) in skip_list.iter() {
     let value = k * 100;
     assert_eq!(*v, value);
 }
+
+// delete
+assert_eq!(skip_list.delete(&1), Some(100));
+assert_eq!(skip_list.delete(&10), None);
+assert_eq!(skip_list.get(&1), None);
 ```
